@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Новый сайт{% endblock %}
+{% block content %}
+  <h1>Создание сайта</h1>
+  <p>Текстовые файлы ограничены 5&nbsp;МБ. После отправки новая версия попадёт на модерацию.</p>
+  <form method="post">
+    <label for="name">Поддомен</label>
+    <input type="text" id="name" name="name" placeholder="my-site" required>
+    <label for="html">index.html</label>
+    <textarea id="html" name="html" placeholder="<!doctype html>..."></textarea>
+    <label for="css">index.css</label>
+    <textarea id="css" name="css" placeholder="body { }"></textarea>
+    <label for="js">index.js</label>
+    <textarea id="js" name="js" placeholder="console.log('hello');"></textarea>
+    <div class="button-row">
+      <button type="submit">Опубликовать</button>
+    </div>
+  </form>
+{% endblock %}
