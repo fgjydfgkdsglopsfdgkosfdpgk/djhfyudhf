@@ -74,7 +74,6 @@ def content_root(tmp_path: Path) -> Path:
 def app(content_root: Path, notifier: RecordingNotifier):
     application = create_app(content_root, notifier=notifier)
     application.config.update(TESTING=True, ADMIN_TOKEN="admintoken")
-    application.config["MODERATION_NOTIFIER"] = notifier
     yield application
 
 

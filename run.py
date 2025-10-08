@@ -5,7 +5,9 @@ import os
 from pathlib import Path
 
 from app import create_app
+from app.accounts import AccountStore
 from app.registry import SiteRegistry
+from app.support import SupportStore
 from app.telegram_bot import TelegramModerationBot
 
 
@@ -18,6 +20,8 @@ def build_app():
     ).resolve()
 
     registry = SiteRegistry(root)
+    account_store = AccountStore(root)
+    support_store = SupportStore(root)
 
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = os.environ.get("TELEGRAM_ADMIN_CHAT")
@@ -29,12 +33,19 @@ def build_app():
         bot = TelegramModerationBot(
             token=token,
             registry=registry,
+            accounts=account_store,
             admin_chat_id=int(chat_id),
             base_url=base_url,
         )
         notifier = bot
 
-    app = create_app(root, registry=registry, notifier=notifier)
+    app = create_app(
+        root,
+        registry=registry,
+        notifier=notifier,
+        accounts=account_store,
+        support=support_store,
+    )
 
     if bot:
         app.telegram_bot = bot  # type: ignore[attr-defined]

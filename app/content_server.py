@@ -10,7 +10,7 @@ from flask import abort, make_response, redirect, request, send_from_directory
 from werkzeug.exceptions import NotFound
 from werkzeug.utils import safe_join
 
-from .registry import SiteRecord, SiteRegistry, SiteStatus
+from .registry import SiteLifecycle, SiteRecord, SiteRegistry
 
 
 _ALLOWED_SEGMENT_RE = re.compile(r"^[A-Za-z0-9-]+$")
@@ -44,8 +44,11 @@ class ContentServer:
 
         return candidate if _ALLOWED_SEGMENT_RE.match(candidate) else None
 
-    def _site_root(self, site: str) -> Path:
-        return (self.root / site).resolve()
+    def _live_root(self, site: str) -> Path:
+        return (self.root / site / "live").resolve()
+
+    def _version_root(self, site: str, version_id: str) -> Path:
+        return (self.root / site / "versions" / version_id).resolve()
 
     def _resolve_site(
         self, path: str
@@ -147,10 +150,11 @@ class ContentServer:
     # Public API
     # ------------------------------------------------------------------
     def _has_preview_access(self, record: SiteRecord) -> bool:
-        if record.status == SiteStatus.APPROVED:
-            return True
+        pending = record.pending_version()
+        if not pending:
+            return False
         token = request.headers.get("X-Preview-Token") or request.args.get("preview_token")
-        return bool(token) and token == record.preview_token
+        return bool(token) and token == pending.preview_token
 
     def _unregistered_site(self, site: str):
         site = escape(site)
@@ -187,10 +191,10 @@ class ContentServer:
         body = (
             "<!doctype html>"
             "<html lang=\"ru\">"
-            "<head><meta charset=\"utf-8\"><title>Сайт отклонён</title></head>"
+            "<head><meta charset=\"utf-8\"><title>Сайт заблокирован</title></head>"
             "<body>"
-            f"<h1>Сайт «{site}» отклонён администрацией</h1>"
-            "<p>Изменения недоступны, свяжитесь с поддержкой для уточнения.</p>"
+            f"<h1>Сайт «{site}» заблокирован</h1>"
+            "<p>Обратитесь в поддержку, если считаете блокировку ошибочной.</p>"
             "</body></html>"
         )
         resp = make_response(body, 403)
@@ -217,13 +221,21 @@ class ContentServer:
             qs = ("?" + request.query_string.decode()) if request.query_string else ""
             return redirect(f"{request.path}/{qs}", code=301)
 
-        if record.status == SiteStatus.REJECTED:
+        if record.lifecycle == SiteLifecycle.DELETED:
+            return self._unregistered_site(site_name)
+
+        if record.lifecycle == SiteLifecycle.BLOCKED:
             return self._rejected_site(record)
 
-        if not self._has_preview_access(record):
-            return self._pending_site(record)
+        pending = record.pending_version()
+        preview_granted = bool(pending and self._has_preview_access(record))
 
-        site_root = self._site_root(site_name)
+        if preview_granted and pending:
+            site_root = self._version_root(site_name, pending.version_id)
+        else:
+            if not record.active_version:
+                return self._pending_site(record)
+            site_root = self._live_root(site_name)
 
         resource = (resource_path or "index.html") if resource_path is not None else "index.html"
         if resource.endswith("/"):

@@ -15,8 +15,9 @@ from telegram.ext import (
     ContextTypes,
 )
 
+from .accounts import AccountStore
 from .notifications import ModerationNotifier
-from .registry import SiteRecord, SiteRegistry, SiteStatus
+from .registry import SiteRecord, SiteRegistry, SiteVersionStatus
 
 
 LOGGER = logging.getLogger(__name__)
@@ -30,11 +31,13 @@ class TelegramModerationBot(ModerationNotifier):
         *,
         token: str,
         registry: SiteRegistry,
+        accounts: AccountStore | None = None,
         admin_chat_id: int,
         base_url: str,
         poll_interval: float = 5.0,
     ) -> None:
         self.registry = registry
+        self.accounts = accounts
         self.admin_chat_id = admin_chat_id
         self.base_url = base_url.rstrip("/")
         self.poll_interval = poll_interval
@@ -80,7 +83,7 @@ class TelegramModerationBot(ModerationNotifier):
     async def _post_init(self, application: Application) -> None:
         # Discover pending sites that existed before the bot started.
         for record in self.registry.list_sites().values():
-            if record.status == SiteStatus.PENDING:
+            if record.pending_version():
                 self.site_pending(record)
         await self._flush_buffers_job(None)
 
@@ -125,7 +128,7 @@ class TelegramModerationBot(ModerationNotifier):
             return
 
         pending = [
-            record for record in self.registry.list_sites().values() if record.status == SiteStatus.PENDING
+            record for record in self.registry.list_sites().values() if record.pending_version()
         ]
 
         if not pending:
@@ -161,6 +164,11 @@ class TelegramModerationBot(ModerationNotifier):
                 await query.answer("Сайт отклонён")
                 await query.edit_message_text(self._format_status_text("rejected", record))
                 self.site_rejected(record)
+                if self.accounts and record.approved_versions():
+                    try:
+                        self.accounts.freeze(record.owner_id)
+                    except KeyError:  # pragma: no cover - defensive
+                        LOGGER.warning("Не удалось заморозить аккаунт %s", record.owner_id)
             else:
                 await query.answer("Неизвестное действие", show_alert=True)
         except Exception as exc:  # pragma: no cover - defensive fallback
@@ -193,7 +201,11 @@ class TelegramModerationBot(ModerationNotifier):
     def _preview_url(self, record: SiteRecord) -> str:
         base = self.base_url
         path = "" if record.name == "_" else f"/{quote(record.name)}"
-        return f"{base}{path}/?preview_token={record.preview_token}"
+        pending = record.pending_version()
+        token = pending.preview_token if pending else ""
+        if not token:
+            return f"{base}{path}/"
+        return f"{base}{path}/?preview_token={token}"
 
     def _format_pending_text(self, record: SiteRecord) -> str:
         preview_url = self._preview_url(record)
@@ -211,13 +223,14 @@ class TelegramModerationBot(ModerationNotifier):
         return f"Статус сайта «{record.name}» обновлён."
 
     async def _send_pending(self, record: SiteRecord) -> None:
-        if record.status != SiteStatus.PENDING:
+        pending = record.pending_version()
+        if not pending or pending.status != SiteVersionStatus.PENDING:
             return
 
         previous = self._seen_tokens.get(record.name)
-        if previous == record.preview_token:
+        if previous == pending.preview_token:
             return
-        self._seen_tokens[record.name] = record.preview_token
+        self._seen_tokens[record.name] = pending.preview_token
 
         keyboard = InlineKeyboardMarkup(
             [

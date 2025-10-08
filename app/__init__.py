@@ -6,10 +6,12 @@ from typing import Optional
 
 from flask import Flask
 
-from .api import create_api_blueprint
+from .accounts import AccountStore
 from .content_server import ContentServer
-from .notifications import ModerationNotifier, NullNotifier
+from .notifications import FreezingNotifier, ModerationNotifier, NullNotifier
 from .registry import SiteRegistry
+from .support import SupportStore
+from .web import create_web_blueprint
 
 
 def create_app(
@@ -17,6 +19,8 @@ def create_app(
     *,
     registry: SiteRegistry | None = None,
     notifier: ModerationNotifier | None = None,
+    accounts: AccountStore | None = None,
+    support: SupportStore | None = None,
 ) -> Flask:
     """Create and configure the Flask application."""
 
@@ -33,9 +37,18 @@ def create_app(
     app.config.setdefault("ADMIN_TOKEN", "changeme-admin-token")
     app.config.setdefault("SITE_BASE_URL", "http://localhost")
 
-    active_notifier = notifier or NullNotifier()
+    base_notifier = notifier or NullNotifier()
+    account_store = accounts or AccountStore(root)
+    support_store = support or SupportStore(root)
+    active_notifier = FreezingNotifier(base_notifier, account_store)
+
     app.config.setdefault("MODERATION_NOTIFIER", active_notifier)
     app.config.setdefault("SITE_REGISTRY", registry)
+    app.config.setdefault("ACCOUNT_STORE", account_store)
+    app.config.setdefault("SUPPORT_STORE", support_store)
+    if not app.config.get("SECRET_KEY"):
+        app.config["SECRET_KEY"] = "dev-secret-key"
+    app.secret_key = app.config["SECRET_KEY"]
 
     # Bootstrap existing directories as approved sites.
     for candidate in root.iterdir():
@@ -51,7 +64,14 @@ def create_app(
     def serve(path: str):
         return server.serve(path)
 
-    app.register_blueprint(create_api_blueprint(registry, notifier=active_notifier))
+    app.register_blueprint(
+        create_web_blueprint(
+            registry,
+            accounts=account_store,
+            support=support_store,
+            notifier=active_notifier,
+        )
+    )
 
     return app
 
