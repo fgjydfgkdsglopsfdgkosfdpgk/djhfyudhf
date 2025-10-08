@@ -47,8 +47,8 @@ class ContentServer:
             return None
         return directory
 
-    def _resolve_site(self, path: str) -> Tuple[str, bool, str, bool]:
-        """Return ``(site_name, via_subdomain, resource_path, needs_redirect)``."""
+    def _resolve_site(self, path: str) -> Tuple[str, bool, Optional[str], bool, bool]:
+        """Return ``(site, via_subdomain, resource_path, needs_redirect, unregistered)``."""
 
         subdomain = self._get_subdomain()
         segments = [segment for segment in path.split("/") if segment]
@@ -56,8 +56,10 @@ class ContentServer:
         if subdomain:
             site_root = self._site_root(subdomain)
             if not site_root:
+                if _ALLOWED_SEGMENT_RE.match(subdomain):
+                    return subdomain, True, None, False, True
                 abort(404)
-            return subdomain, True, "/".join(segments), False
+            return subdomain, True, "/".join(segments), False, False
 
         if segments:
             candidate = segments[0]
@@ -67,12 +69,15 @@ class ContentServer:
             if site_root:
                 resource_segments = segments[1:]
                 needs_redirect = not resource_segments and not request.path.endswith("/")
-                return candidate, False, "/".join(resource_segments), needs_redirect
+                return candidate, False, "/".join(resource_segments), needs_redirect, False
+            if _ALLOWED_SEGMENT_RE.match(candidate):
+                return candidate, False, None, False, True
 
+        resource = "/".join(segments)
         site_root = self._site_root(_ROOT_SITE)
         if not site_root:
             abort(404)
-        return _ROOT_SITE, False, "/".join(segments), False
+        return _ROOT_SITE, False, resource, False, False
 
     # ------------------------------------------------------------------
     # Path helpers
@@ -141,8 +146,26 @@ class ContentServer:
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
+    def _unregistered_site(self, site: str):
+        site = escape(site)
+        body = (
+            "<!doctype html>"
+            "<html lang=\"ru\">"
+            "<head><meta charset=\"utf-8\"><title>Поддомен свободен</title></head>"
+            "<body>"
+            f"<h1>Поддомен «{site}» не зарегистрирован</h1>"
+            "<p>Этот поддомен может быть вашим. Хотите занять его? Это бесплатно!</p>"
+            "</body></html>"
+        )
+        resp = make_response(body, 404)
+        resp.headers["Content-Type"] = "text/html; charset=utf-8"
+        return resp
+
     def serve(self, path: str):
-        site_name, via_subdomain, resource_path, needs_redirect = self._resolve_site(path)
+        site_name, via_subdomain, resource_path, needs_redirect, unregistered = self._resolve_site(path)
+
+        if unregistered:
+            return self._unregistered_site(site_name)
 
         if needs_redirect:
             qs = ("?" + request.query_string.decode()) if request.query_string else ""
@@ -152,7 +175,7 @@ class ContentServer:
         if not site_root:
             abort(404)
 
-        resource = resource_path or "index.html"
+        resource = (resource_path or "index.html") if resource_path is not None else "index.html"
         if resource.endswith("/"):
             abort(404)
 

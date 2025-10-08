@@ -52,8 +52,22 @@ def test_subdomain_script(client):
     assert "site1-status" in response.get_data(as_text=True)
 
 
-def test_unknown_site_returns_404(client):
+def test_unknown_site_returns_invitation(client):
     response = client.get("/unknown/", headers={"Host": "example.com"})
+    body = response.get_data(as_text=True)
+    assert response.status_code == 404
+    assert "этот поддомен может быть вашим" in body.lower()
+
+
+def test_unknown_subdomain_returns_invitation(client):
+    response = client.get("/", headers={"Host": "ghost.example.com"})
+    body = response.get_data(as_text=True)
+    assert response.status_code == 404
+    assert "этот поддомен может быть вашим" in body.lower()
+
+
+def test_missing_resource_in_registered_site_404(client):
+    response = client.get("/site1/missing.js", headers={"Host": "example.com"})
     assert response.status_code == 404
 
 
