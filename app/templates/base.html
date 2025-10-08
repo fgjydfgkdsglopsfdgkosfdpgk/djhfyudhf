@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}Панель управления{% endblock %}</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 0; background: #f4f4f4; }
+    header { background: #20232a; color: #fff; padding: 1rem; }
+    nav a { color: #61dafb; margin-right: 1rem; text-decoration: none; }
+    main { padding: 1.5rem; }
+    form { background: #fff; padding: 1rem; border-radius: 4px; margin-bottom: 1.5rem; }
+    form.inline { display: inline; background: transparent; padding: 0; margin: 0 0.5rem 0 0; }
+    form.inline button { margin-top: 0; }
+    label { display: block; font-weight: bold; margin-top: 0.5rem; }
+    input[type="text"], input[type="email"], textarea { width: 100%; padding: 0.5rem; margin-top: 0.25rem; }
+    textarea { min-height: 120px; }
+    .button-row { margin-top: 1rem; }
+    button { padding: 0.5rem 1rem; }
+    .flash { padding: 0.75rem 1rem; border-radius: 4px; margin-bottom: 1rem; }
+    .flash.success { background: #d1fae5; }
+    .flash.danger { background: #fee2e2; }
+    .flash.warning { background: #fef3c7; }
+    .flash.info { background: #e0f2fe; }
+    table { width: 100%; border-collapse: collapse; background: #fff; }
+    th, td { padding: 0.5rem; border-bottom: 1px solid #ddd; text-align: left; }
+    .status { font-weight: bold; }
+  </style>
+</head>
+<body>
+  <header>
+    <nav>
+      <a href="{{ url_for('web.index') }}">Главная</a>
+      {% if g.current_account %}
+        <a href="{{ url_for('web.dashboard') }}">Панель</a>
+        <a href="{{ url_for('web.create_site') }}">Новый сайт</a>
+        <a href="{{ url_for('web.support_form') }}">Поддержка</a>
+        <a href="{{ url_for('web.settings') }}">Настройки</a>
+        <a href="{{ url_for('web.logout') }}">Выход</a>
+      {% else %}
+        <a href="{{ url_for('web.register') }}">Регистрация</a>
+        <a href="{{ url_for('web.login') }}">Вход</a>
+      {% endif %}
+    </nav>
+  </header>
+  <main>
+    {% if g.current_account and g.current_account.frozen %}
+      <div class="flash danger">Аккаунт заморожен. Обратитесь в поддержку для разблокировки.</div>
+    {% endif %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

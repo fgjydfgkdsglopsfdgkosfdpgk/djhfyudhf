@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Панель{% endblock %}
+{% block content %}
+  <h1>Здравствуйте, {{ account.display_name }}!</h1>
+  <p>Ваш токен входа: <code>{{ account.token }}</code></p>
+  <p><a href="{{ url_for('web.create_site') }}">Создать новый сайт</a></p>
+  {% if sites %}
+    <table>
+      <thead>
+        <tr><th>Поддомен</th><th>Состояние</th><th>Активная версия</th><th>Действия</th></tr>
+      </thead>
+      <tbody>
+        {% for site in sites %}
+          <tr>
+            <td>{{ site.name }}</td>
+            <td class="status">{{ site.lifecycle.value }}</td>
+            <td>{% if site.active_version %}{{ site.active_version }}{% else %}—{% endif %}</td>
+            <td><a href="{{ url_for('web.site_detail', name=site.name) }}">Управление</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>У вас пока нет сайтов.</p>
+  {% endif %}
+{% endblock %}
