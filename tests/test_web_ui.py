@@ -32,11 +32,13 @@ def test_ui_account_and_site_flow(app, client, notifier):
 
     dashboard_html = client.get("/ui/dashboard").get_data(as_text=True)
     assert "data-status-banner" in dashboard_html
-    assert "ожидает" in dashboard_html.lower()
+    assert "находится на рассмотрении" in dashboard_html
+    assert "Новая версия" not in dashboard_html
 
     pending_view = client.get("/ui/sites/mysite").get_data(as_text=True)
     assert "data-status-banner" in pending_view
     assert "ещё не прошёл модерацию" in pending_view
+    assert "Новая версия" not in pending_view
 
     registry.approve("mysite")
     assert registry.get("mysite").active_version is not None

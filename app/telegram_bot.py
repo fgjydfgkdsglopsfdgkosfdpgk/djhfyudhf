@@ -1,6 +1,7 @@
 """Telegram moderation bot integration."""
 from __future__ import annotations
 
+import asyncio
 from collections import deque
 import logging
 from threading import Lock, Thread
@@ -46,6 +47,7 @@ class TelegramModerationBot(ModerationNotifier):
         self._status_buffer: Deque[Tuple[str, SiteRecord]] = deque()
         self._buffer_lock = Lock()
         self._seen_tokens: Dict[str, str] = {}
+        self._loop: asyncio.AbstractEventLoop | None = None
 
         self._install_handlers()
 
@@ -55,16 +57,19 @@ class TelegramModerationBot(ModerationNotifier):
     def site_pending(self, record: SiteRecord) -> None:
         with self._buffer_lock:
             self._pending_buffer.append(record)
+        self._trigger_flush()
 
     def site_approved(self, record: SiteRecord) -> None:
         with self._buffer_lock:
             self._status_buffer.append(("approved", record))
             self._seen_tokens.pop(record.name, None)
+        self._trigger_flush()
 
     def site_rejected(self, record: SiteRecord) -> None:
         with self._buffer_lock:
             self._status_buffer.append(("rejected", record))
             self._seen_tokens.pop(record.name, None)
+        self._trigger_flush()
 
     # ------------------------------------------------------------------
     # Telegram application lifecycle
@@ -73,11 +78,17 @@ class TelegramModerationBot(ModerationNotifier):
         self._application.add_handler(CommandHandler("start", self._cmd_start))
         self._application.add_handler(CommandHandler("pending", self._cmd_pending))
         self._application.add_handler(CallbackQueryHandler(self._handle_callback))
-        self._application.job_queue.run_repeating(
-            self._flush_buffers_job,
-            interval=self.poll_interval,
-            name="moderation-flush",
-        )
+        job_queue = self._application.job_queue
+        if job_queue is not None:
+            job_queue.run_repeating(
+                self._flush_buffers_job,
+                interval=self.poll_interval,
+                name="moderation-flush",
+            )
+        else:
+            LOGGER.warning(
+                "Job queue unavailable; moderation bot will flush notifications on-demand."
+            )
         self._application.post_init = self._post_init
 
     async def _post_init(self, application: Application) -> None:
@@ -94,7 +105,20 @@ class TelegramModerationBot(ModerationNotifier):
         """Start the bot and block the current thread."""
 
         LOGGER.info("Starting Telegram moderation bot")
-        self._application.run_polling(close_loop=False, allowed_updates=Update.ALL_TYPES)
+        loop = asyncio.new_event_loop()
+        try:
+            asyncio.set_event_loop(loop)
+            self._loop = loop
+            self._application.run_polling(
+                close_loop=True,
+                stop_signals=None,
+                allowed_updates=Update.ALL_TYPES,
+            )
+        finally:
+            self._loop = None
+            asyncio.set_event_loop(None)
+            if not loop.is_closed():
+                loop.close()
 
     def start_background(self) -> Thread:
         """Start the bot in a background daemon thread."""
@@ -194,6 +218,14 @@ class TelegramModerationBot(ModerationNotifier):
             await self._send_pending(record)
         for status, record in statuses:
             await self._send_status(status, record)
+
+    def _trigger_flush(self) -> None:
+        loop = self._loop
+        if loop and loop.is_running():
+            asyncio.run_coroutine_threadsafe(
+                self._flush_buffers_job(None),
+                loop,
+            )
 
     # ------------------------------------------------------------------
     # Message helpers

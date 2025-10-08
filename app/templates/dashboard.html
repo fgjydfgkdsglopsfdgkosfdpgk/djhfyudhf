@@ -21,7 +21,7 @@
           <button type="button" aria-label="Скрыть" data-status-dismiss>&times;</button>
         </div>
       {% endif %}
-      {% if site.pending_version() %}
+      {% if site.pending_version() and site.active_version %}
         <div class="status-banner status-pending" data-status-banner>
           <strong>{{ site.name }}:</strong> Новая версия ожидает проверки.
           <button type="button" aria-label="Скрыть" data-status-dismiss>&times;</button>

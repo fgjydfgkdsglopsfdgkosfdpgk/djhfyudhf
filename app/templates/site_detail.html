@@ -16,7 +16,7 @@
       <button type="button" aria-label="Скрыть" data-status-dismiss>&times;</button>
     </div>
   {% endif %}
-  {% if pending_version %}
+  {% if pending_version and record.active_version %}
     <div class="status-banner status-pending" data-status-banner>
       Новая версия <code>{{ pending_version.version_id }}</code> ожидает проверки модерацией.
       <button type="button" aria-label="Скрыть" data-status-dismiss>&times;</button>
