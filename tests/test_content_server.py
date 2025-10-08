@@ -2,67 +2,66 @@ from __future__ import annotations
 
 from urllib.parse import urlparse
 
-import pytest
 
-
-@pytest.mark.parametrize(
-    "path, expected_substring",
-    [
-        ("/", "<base href=\"/\">") ,
-        ("/extra.html", "Extra"),
-    ],
-)
-def test_global_html_served(client, path, expected_substring):
-    response = client.get(path)
+def test_main_site_html(client):
+    response = client.get("/", headers={"Host": "example.com"})
+    body = response.get_data(as_text=True)
     assert response.status_code == 200
-    assert expected_substring in response.get_data(as_text=True)
+    assert "Example.com" in body
+    assert '<base href="/">' in body
 
 
-def test_global_static_served(client):
-    response = client.get("/static/app.css")
+def test_main_site_script(client):
+    response = client.get("/index.js", headers={"Host": "example.com"})
     assert response.status_code == 200
-    assert "color" in response.get_data(as_text=True)
+    assert "__siteLoaded" in response.get_data(as_text=True)
 
 
-def test_directory_redirect(client):
-    response = client.get("/site", follow_redirects=False)
+def test_path_site_redirect(client):
+    response = client.get("/site1", headers={"Host": "example.com"}, follow_redirects=False)
     assert response.status_code == 301
-    location = response.headers["Location"]
-    parsed = urlparse(location)
-    assert parsed.path == "/site/"
+    parsed = urlparse(response.headers["Location"])
+    assert parsed.path == "/site1/"
 
 
-def test_subdirectory_html(client):
-    response = client.get("/site/page.html")
+def test_path_site_html(client):
+    response = client.get("/site1/", headers={"Host": "example.com"})
+    body = response.get_data(as_text=True)
     assert response.status_code == 200
-    assert "Site page" in response.get_data(as_text=True)
-    assert '<base href="/site/">' in response.get_data(as_text=True)
+    assert "Site 1" in body
+    assert '<base href="/site1/">' in body
 
 
-def test_subdirectory_static(client):
-    response = client.get("/site/static/site.css")
+def test_path_site_script(client):
+    response = client.get("/site1/index.js", headers={"Host": "example.com"})
     assert response.status_code == 200
-    assert "blue" in response.get_data(as_text=True)
+    assert "site1-status" in response.get_data(as_text=True)
 
 
 def test_subdomain_html(client):
-    response = client.get("/", headers={"Host": "blog.localhost"})
+    response = client.get("/", headers={"Host": "site1.example.com"})
+    body = response.get_data(as_text=True)
     assert response.status_code == 200
-    assert "Blog" in response.get_data(as_text=True)
+    assert "Site 1" in body
+    assert '<base href="/">' in body
 
 
-def test_subdomain_static(client):
-    response = client.get("/static/blog.css", headers={"Host": "blog.localhost"})
+def test_subdomain_script(client):
+    response = client.get("/index.js", headers={"Host": "site1.example.com"})
     assert response.status_code == 200
-    assert "red" in response.get_data(as_text=True)
+    assert "site1-status" in response.get_data(as_text=True)
+
+
+def test_unknown_site_returns_404(client):
+    response = client.get("/unknown/", headers={"Host": "example.com"})
+    assert response.status_code == 404
 
 
 def test_traversal_blocked(client):
-    # ``safe_join`` should ensure that attempts to traverse outside are blocked.
-    response = client.get("/../run.py")
+    response = client.get("/../run.py", headers={"Host": "example.com"})
     assert response.status_code == 404
 
 
 def test_invalid_segment_blocked(client):
-    response = client.get("/../../secret")
+    response = client.get("/site1/../../etc/passwd", headers={"Host": "example.com"})
     assert response.status_code == 404

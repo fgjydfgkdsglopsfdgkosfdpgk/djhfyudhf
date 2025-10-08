@@ -4,24 +4,19 @@ from __future__ import annotations
 from html import escape
 import re
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 from flask import abort, make_response, redirect, request, send_from_directory
 from werkzeug.exceptions import NotFound
 from werkzeug.utils import safe_join
 
 
-_ALLOWED_SEGMENT_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+_ALLOWED_SEGMENT_RE = re.compile(r"^[A-Za-z0-9-]+$")
+_ROOT_SITE = "_"
 
 
 class ContentServer:
-    """Serve HTML and static assets from a configurable content root.
-
-    The original implementation relied heavily on ``os.path.join`` which made it
-    possible to traverse outside of the intended directory tree using path
-    components such as ``..``.  This class centralises the logic for resolving
-    paths and ensures that every path is validated before it is used.
-    """
+    """Serve HTML and static assets from a configurable content root."""
 
     def __init__(self, root: Path):
         self.root = root.resolve()
@@ -46,6 +41,39 @@ class ContentServer:
 
         return candidate if _ALLOWED_SEGMENT_RE.match(candidate) else None
 
+    def _site_root(self, site: str) -> Optional[Path]:
+        directory = self.root / site
+        if not directory.exists() or not directory.is_dir():
+            return None
+        return directory
+
+    def _resolve_site(self, path: str) -> Tuple[str, bool, str, bool]:
+        """Return ``(site_name, via_subdomain, resource_path, needs_redirect)``."""
+
+        subdomain = self._get_subdomain()
+        segments = [segment for segment in path.split("/") if segment]
+
+        if subdomain:
+            site_root = self._site_root(subdomain)
+            if not site_root:
+                abort(404)
+            return subdomain, True, "/".join(segments), False
+
+        if segments:
+            candidate = segments[0]
+            site_root = None
+            if _ALLOWED_SEGMENT_RE.match(candidate):
+                site_root = self._site_root(candidate)
+            if site_root:
+                resource_segments = segments[1:]
+                needs_redirect = not resource_segments and not request.path.endswith("/")
+                return candidate, False, "/".join(resource_segments), needs_redirect
+
+        site_root = self._site_root(_ROOT_SITE)
+        if not site_root:
+            abort(404)
+        return _ROOT_SITE, False, "/".join(segments), False
+
     # ------------------------------------------------------------------
     # Path helpers
     # ------------------------------------------------------------------
@@ -67,7 +95,6 @@ class ContentServer:
         try:
             directory_resolved = directory.resolve()
         except FileNotFoundError:
-            # Missing directories should be treated as absent resources.
             return None
 
         if directory_resolved not in resolved.parents and resolved != directory_resolved:
@@ -85,10 +112,10 @@ class ContentServer:
                 flags=re.I,
             )
 
-        m = re.search(r"<head([^>]*)>", html_text, flags=re.I)
+        match = re.search(r"<head([^>]*)>", html_text, flags=re.I)
         insert = f'<base href="{base_href}">'
-        if m:
-            pos = m.end()
+        if match:
+            pos = match.end()
             return html_text[:pos] + insert + html_text[pos:]
         return insert + html_text
 
@@ -115,84 +142,26 @@ class ContentServer:
     # Public API
     # ------------------------------------------------------------------
     def serve(self, path: str):
-        subdomain = self._get_subdomain()
+        site_name, via_subdomain, resource_path, needs_redirect = self._resolve_site(path)
 
-        # Redirect ``/site`` -> ``/site/`` when the directory exists.
-        if path and "/" not in path.rstrip("/"):
-            if self._valid_directory(path):
-                if not request.path.endswith("/"):
-                    qs = ("?" + request.query_string.decode()) if request.query_string else ""
-                    return redirect(f"{request.path}/{qs}", code=301)
+        if needs_redirect:
+            qs = ("?" + request.query_string.decode()) if request.query_string else ""
+            return redirect(f"{request.path}/{qs}", code=301)
 
-        explicit_response = self._serve_explicit_prefix(path)
-        if explicit_response is not None:
-            return explicit_response
+        site_root = self._site_root(site_name)
+        if not site_root:
+            abort(404)
 
-        if subdomain:
-            subdomain_response = self._serve_subdomain(subdomain, path)
-            if subdomain_response is not None:
-                return subdomain_response
+        resource = resource_path or "index.html"
+        if resource.endswith("/"):
+            abort(404)
 
-        return self._serve_global(path)
+        base_href = "/" if via_subdomain or site_name == _ROOT_SITE else f"/{site_name}/"
 
-    # ------------------------------------------------------------------
-    # Serving strategies
-    # ------------------------------------------------------------------
-    def _serve_explicit_prefix(self, path: str):
-        path_parts = [p for p in path.split("/") if p]
-        if not path_parts:
-            return None
+        if resource in {"", "index.html"}:
+            return self._serve_html(site_root, "index.html", base_href)
 
-        possible_sub = path_parts[0]
-        if not _ALLOWED_SEGMENT_RE.match(possible_sub):
-            return None
-
-        if possible_sub in {"static", "html"}:
-            return None
-
-        sub_dir = self.root / possible_sub
-        if not sub_dir.is_dir():
-            return None
-
-        sub_path = "/".join(path_parts[1:])
-        if sub_path.startswith("static/"):
-            return self._serve_static(sub_dir / "static", sub_path[len("static/"):])
-
-        html_dir = sub_dir / "html"
-        if sub_path in ("", "html/index.html"):
-            return self._serve_html(html_dir, "index.html", f"/{possible_sub}/")
-
-        return self._serve_html(html_dir, sub_path, f"/{possible_sub}/")
-
-    def _serve_subdomain(self, subdomain: str, path: str):
-        sub_dir = self.root / subdomain
-        if not sub_dir.is_dir():
-            return None
-
-        if path.startswith("static/"):
-            return self._serve_static(sub_dir / "static", path[len("static/"):])
-
-        html_dir = sub_dir / "html"
-        if path in ("", "html/index.html"):
-            return self._serve_html(html_dir, "index.html", "/")
-
-        return self._serve_html(html_dir, path, "/")
-
-    def _serve_global(self, path: str):
-        if path.startswith("static/"):
-            return self._serve_static(self.root / "static", path[len("static/"):])
-
-        html_dir = self.root / "html"
-        if path in ("", "html/index.html"):
-            return self._serve_html(html_dir, "index.html", "/")
-
-        return self._serve_html(html_dir, path, "/")
-
-    def _valid_directory(self, segment: str) -> bool:
-        if not _ALLOWED_SEGMENT_RE.match(segment):
-            return False
-        candidate = self.root / segment
-        return candidate.is_dir()
+        return self._serve_static(site_root, resource)
 
 
 __all__ = ["ContentServer"]

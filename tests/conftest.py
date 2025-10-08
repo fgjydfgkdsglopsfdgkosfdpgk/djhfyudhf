@@ -14,27 +14,37 @@ from app import create_app
 def content_root(tmp_path: Path) -> Path:
     root = tmp_path
 
-    html_dir = root / "html"
-    html_dir.mkdir()
-    (html_dir / "index.html").write_text("<html><head><title>Root</title></head><body>Root</body></html>", encoding="utf-8")
-    (html_dir / "extra.html").write_text("<html><body>Extra</body></html>", encoding="utf-8")
+    main_site = root / "_"
+    main_site.mkdir()
+    (main_site / "index.html").write_text(
+        """
+        <html><head><title>Example Home</title><link rel=\"stylesheet\" href=\"index.css\"></head>
+        <body><h1>Example.com</h1><p>Welcome to the main site.</p><script src=\"index.js\"></script></body>
+        </html>
+        """.strip(),
+        encoding="utf-8",
+    )
+    (main_site / "index.css").write_text("body { color: #123456; }", encoding="utf-8")
+    (main_site / "index.js").write_text(
+        "window.__siteLoaded = 'root';",
+        encoding="utf-8",
+    )
 
-    static_dir = root / "static"
-    static_dir.mkdir()
-    (static_dir / "app.css").write_text("body { color: #333; }", encoding="utf-8")
-
-    site_dir = root / "site"
-    (site_dir / "html").mkdir(parents=True)
-    (site_dir / "html" / "index.html").write_text("<html><body>Site</body></html>", encoding="utf-8")
-    (site_dir / "html" / "page.html").write_text("<html><body>Site page</body></html>", encoding="utf-8")
-    (site_dir / "static").mkdir()
-    (site_dir / "static" / "site.css").write_text("body { color: blue; }", encoding="utf-8")
-
-    sub_dir = root / "blog"
-    (sub_dir / "html").mkdir(parents=True)
-    (sub_dir / "html" / "index.html").write_text("<html><body>Blog</body></html>", encoding="utf-8")
-    (sub_dir / "static").mkdir()
-    (sub_dir / "static" / "blog.css").write_text("body { color: red; }", encoding="utf-8")
+    site1 = root / "site1"
+    site1.mkdir()
+    (site1 / "index.html").write_text(
+        """
+        <html><head><title>Site One</title><link rel=\"stylesheet\" href=\"index.css\"></head>
+        <body><h1>Site 1</h1><p>Subsite available via path and subdomain.</p><script src=\"index.js\"></script></body>
+        </html>
+        """.strip(),
+        encoding="utf-8",
+    )
+    (site1 / "index.css").write_text("body { color: #abcdef; }", encoding="utf-8")
+    (site1 / "index.js").write_text(
+        "document.body.innerHTML += '<span id=\\'site1-status\\'></span>';",
+        encoding="utf-8",
+    )
 
     return root
 

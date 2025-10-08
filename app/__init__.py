@@ -10,17 +10,10 @@ from .content_server import ContentServer
 
 
 def create_app(content_root: Optional[Path] = None) -> Flask:
-    """Create and configure the Flask application.
+    """Create and configure the Flask application."""
 
-    Parameters
-    ----------
-    content_root:
-        Base directory that contains the ``html`` and ``static`` folders as well as
-        optional sub-directories for subdomain specific content.  When omitted the
-        directory that contains this module is used.
-    """
-
-    root = Path(content_root or Path(__file__).resolve().parent).resolve()
+    default_root = Path(__file__).resolve().parent / "sites"
+    root = Path(content_root or default_root).resolve()
     server = ContentServer(root)
 
     app = Flask(__name__, static_folder=None)
