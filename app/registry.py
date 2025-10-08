@@ -198,6 +198,25 @@ class SiteRegistry:
         (version_dir / "index.css").write_text(css, encoding="utf-8")
         (version_dir / "index.js").write_text(js, encoding="utf-8")
 
+    def _read_bundle(self, directory: Path) -> Optional[Dict[str, str]]:
+        try:
+            html = (directory / "index.html").read_text(encoding="utf-8")
+            css = (directory / "index.css").read_text(encoding="utf-8")
+            js = (directory / "index.js").read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return None
+        return {"html": html, "css": css, "js": js}
+
+    def _bundle_timestamp(self, directory: Path) -> str:
+        mtimes = []
+        for name in ("index.html", "index.css", "index.js"):
+            path = directory / name
+            if path.exists():
+                mtimes.append(path.stat().st_mtime)
+        if not mtimes:
+            return datetime.now(tz=timezone.utc).isoformat()
+        return datetime.fromtimestamp(max(mtimes), tz=timezone.utc).isoformat()
+
     def _read_version_file(self, name: str, version_id: str, filename: str) -> str:
         path = self._version_dir(name, version_id) / filename
         if not path.exists():
@@ -245,13 +264,81 @@ class SiteRegistry:
         owner_token = secrets.token_urlsafe(24)
         version_id = "v1"
         site_root = self.root / name
+        versions_root = site_root / "versions"
+        existing_versions = []
+        if versions_root.exists():
+            for candidate in sorted(versions_root.iterdir()):
+                if not candidate.is_dir():
+                    continue
+                bundle = self._read_bundle(candidate)
+                if not bundle:
+                    continue
+                existing_versions.append(
+                    (
+                        candidate.name,
+                        bundle,
+                        self._bundle_timestamp(candidate),
+                    )
+                )
+
+        live_bundle = self._read_bundle(site_root / "live")
+
+        if existing_versions:
+            version_records: Dict[str, SiteVersion] = {}
+            bundle_map = {version_name: bundle for version_name, bundle, _ in existing_versions}
+            for existing_id, _, created_at in existing_versions:
+                version_records[existing_id] = SiteVersion(
+                    version_id=existing_id,
+                    status=
+                    SiteVersionStatus.APPROVED
+                    if lifecycle == SiteLifecycle.ACTIVE
+                    else SiteVersionStatus.PENDING,
+                    preview_token="",
+                    created_at=created_at,
+                )
+
+            active_version = None
+            if live_bundle:
+                for existing_id, bundle in bundle_map.items():
+                    if bundle == live_bundle:
+                        active_version = existing_id
+                        break
+
+            if lifecycle == SiteLifecycle.ACTIVE and not active_version and existing_versions:
+                active_version = existing_versions[-1][0]
+
+            record = SiteRecord(
+                name=name,
+                owner_id=owner_id,
+                owner_token=owner_token,
+                lifecycle=lifecycle,
+                active_version=active_version if lifecycle == SiteLifecycle.ACTIVE else None,
+                versions=version_records,
+            )
+            self._sites[name] = record
+            if (
+                record.lifecycle == SiteLifecycle.ACTIVE
+                and record.active_version
+                and (
+                    not live_bundle
+                    or bundle_map.get(record.active_version) != live_bundle
+                )
+            ):
+                self._copy_to_live(name, record.active_version)
+            self._dump()
+            return record
+
         html_path = site_root / "index.html"
         css_path = site_root / "index.css"
         js_path = site_root / "index.js"
-        html = html_path.read_text(encoding="utf-8") if html_path.exists() else ""
-        css = css_path.read_text(encoding="utf-8") if css_path.exists() else ""
-        js = js_path.read_text(encoding="utf-8") if js_path.exists() else ""
-        self._write_version_files(name, version_id, html, css, js)
+        bundle = self._read_bundle(site_root)
+        if not bundle:
+            bundle = live_bundle or {
+                "html": html_path.read_text(encoding="utf-8") if html_path.exists() else "",
+                "css": css_path.read_text(encoding="utf-8") if css_path.exists() else "",
+                "js": js_path.read_text(encoding="utf-8") if js_path.exists() else "",
+            }
+        self._write_version_files(name, version_id, bundle["html"], bundle["css"], bundle["js"])
         record = SiteRecord(
             name=name,
             owner_id=owner_id,

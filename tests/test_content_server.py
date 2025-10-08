@@ -2,7 +2,7 @@ from urllib.parse import urlparse
 
 import pytest
 
-from app.registry import SiteLifecycle, SiteVersionStatus
+from app.registry import SiteLifecycle, SiteRegistry, SiteVersionStatus
 
 
 @pytest.fixture()
@@ -13,6 +13,34 @@ def registry(app):
 @pytest.fixture()
 def accounts(app):
     return app.config["ACCOUNT_STORE"]
+
+
+def test_register_existing_site_preserves_packaged_versions(tmp_path):
+    root = tmp_path
+    site_dir = root / "demo"
+    live_dir = site_dir / "live"
+    version_dir = site_dir / "versions" / "v1"
+    live_dir.mkdir(parents=True)
+    version_dir.mkdir(parents=True)
+
+    html = "<html><body><h1>Demo</h1></body></html>"
+    css = "body { color: green; }"
+    js = "console.log('demo');"
+    for directory in (live_dir, version_dir):
+        (directory / "index.html").write_text(html, encoding="utf-8")
+        (directory / "index.css").write_text(css, encoding="utf-8")
+        (directory / "index.js").write_text(js, encoding="utf-8")
+
+    registry = SiteRegistry(root)
+    record = registry.register_existing_site("demo")
+
+    assert record.lifecycle == SiteLifecycle.ACTIVE
+    assert record.active_version == "v1"
+    assert record.pending_version() is None
+
+    content = registry.read_content("demo")
+    assert content["html"] == html
+    assert (version_dir / "index.html").read_text(encoding="utf-8") == html
 
 
 def test_main_site_html(client):
