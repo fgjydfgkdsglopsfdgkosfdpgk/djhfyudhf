@@ -258,11 +258,6 @@ class SiteRegistry:
         lifecycle: SiteLifecycle = SiteLifecycle.ACTIVE,
     ) -> SiteRecord:
         self._validate_name(name)
-        record = self._sites.get(name)
-        if record:
-            return record
-        owner_token = secrets.token_urlsafe(24)
-        version_id = "v1"
         site_root = self.root / name
         versions_root = site_root / "versions"
         existing_versions = []
@@ -281,53 +276,98 @@ class SiteRegistry:
                     )
                 )
 
+        bundle_map = {version_name: bundle for version_name, bundle, _ in existing_versions}
         live_bundle = self._read_bundle(site_root / "live")
 
-        if existing_versions:
-            version_records: Dict[str, SiteVersion] = {}
-            bundle_map = {version_name: bundle for version_name, bundle, _ in existing_versions}
+        record = self._sites.get(name)
+        if record:
+            changed = False
+            desired_status = (
+                SiteVersionStatus.APPROVED
+                if lifecycle == SiteLifecycle.ACTIVE
+                else SiteVersionStatus.PENDING
+            )
+
             for existing_id, _, created_at in existing_versions:
-                version_records[existing_id] = SiteVersion(
-                    version_id=existing_id,
-                    status=
-                    SiteVersionStatus.APPROVED
-                    if lifecycle == SiteLifecycle.ACTIVE
-                    else SiteVersionStatus.PENDING,
+                version = record.versions.get(existing_id)
+                if not version:
+                    record.versions[existing_id] = SiteVersion(
+                        version_id=existing_id,
+                        status=desired_status,
+                        preview_token="",
+                        created_at=created_at,
+                    )
+                    changed = True
+                elif (
+                    lifecycle == SiteLifecycle.ACTIVE
+                    and version.status == SiteVersionStatus.PENDING
+                ):
+                    version.status = SiteVersionStatus.APPROVED
+                    changed = True
+
+            if not record.versions and live_bundle:
+                version_id = record.active_version or "v1"
+                self._write_version_files(
+                    name,
+                    version_id,
+                    live_bundle["html"],
+                    live_bundle["css"],
+                    live_bundle["js"],
+                )
+                created_at = self._bundle_timestamp(self._version_dir(name, version_id))
+                record.versions[version_id] = SiteVersion(
+                    version_id=version_id,
+                    status=desired_status,
                     preview_token="",
                     created_at=created_at,
                 )
+                existing_versions.append((version_id, live_bundle, created_at))
+                bundle_map[version_id] = live_bundle
+                changed = True
 
-            active_version = None
-            if live_bundle:
-                for existing_id, bundle in bundle_map.items():
-                    if bundle == live_bundle:
-                        active_version = existing_id
-                        break
+            if lifecycle == SiteLifecycle.ACTIVE and live_bundle:
+                active_version = record.active_version if record.active_version else None
+                if not active_version or active_version not in bundle_map:
+                    active_version = None
+                if active_version and bundle_map.get(active_version) != live_bundle:
+                    active_version = None
+                if not active_version:
+                    for existing_id, bundle in bundle_map.items():
+                        if bundle == live_bundle:
+                            active_version = existing_id
+                            break
+                if not active_version and existing_versions:
+                    active_version = existing_versions[-1][0]
+                if active_version:
+                    if record.active_version != active_version:
+                        record.active_version = active_version
+                        changed = True
+                    version = record.versions.get(active_version)
+                    if (
+                        version
+                        and version.status != SiteVersionStatus.APPROVED
+                        and lifecycle == SiteLifecycle.ACTIVE
+                    ):
+                        version.status = SiteVersionStatus.APPROVED
+                        changed = True
+                    if bundle_map.get(active_version) != live_bundle:
+                        self._copy_to_live(name, active_version)
+                        changed = True
 
-            if lifecycle == SiteLifecycle.ACTIVE and not active_version and existing_versions:
-                active_version = existing_versions[-1][0]
-
-            record = SiteRecord(
-                name=name,
-                owner_id=owner_id,
-                owner_token=owner_token,
-                lifecycle=lifecycle,
-                active_version=active_version if lifecycle == SiteLifecycle.ACTIVE else None,
-                versions=version_records,
-            )
-            self._sites[name] = record
             if (
-                record.lifecycle == SiteLifecycle.ACTIVE
-                and record.active_version
-                and (
-                    not live_bundle
-                    or bundle_map.get(record.active_version) != live_bundle
-                )
+                record.lifecycle == SiteLifecycle.PENDING
+                and lifecycle == SiteLifecycle.ACTIVE
+                and live_bundle
             ):
-                self._copy_to_live(name, record.active_version)
-            self._dump()
+                record.lifecycle = SiteLifecycle.ACTIVE
+                changed = True
+
+            if changed:
+                self._dump()
             return record
 
+        owner_token = secrets.token_urlsafe(24)
+        version_id = "v1"
         html_path = site_root / "index.html"
         css_path = site_root / "index.css"
         js_path = site_root / "index.js"

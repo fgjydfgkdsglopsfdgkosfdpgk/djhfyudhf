@@ -2,6 +2,26 @@
 {% block title %}Сайт {{ record.name }}{% endblock %}
 {% block content %}
   <h1>Управление сайтом {{ record.name }}</h1>
+  {% if lifecycle != SiteLifecycle.ACTIVE %}
+    <div class="status-banner status-{{ lifecycle.value }}" data-status-banner>
+      {% if lifecycle == SiteLifecycle.PENDING %}
+        Этот сайт ещё не прошёл модерацию.
+      {% elif lifecycle == SiteLifecycle.BLOCKED %}
+        Этот сайт заблокирован. Доступен только архив и история изменений.
+      {% elif lifecycle == SiteLifecycle.DELETED %}
+        Сайт удалён и недоступен для посетителей.
+      {% else %}
+        Текущее состояние сайта: {{ lifecycle.value }}.
+      {% endif %}
+      <button type="button" aria-label="Скрыть" data-status-dismiss>&times;</button>
+    </div>
+  {% endif %}
+  {% if pending_version %}
+    <div class="status-banner status-pending" data-status-banner>
+      Новая версия <code>{{ pending_version.version_id }}</code> ожидает проверки модерацией.
+      <button type="button" aria-label="Скрыть" data-status-dismiss>&times;</button>
+    </div>
+  {% endif %}
   <p>Состояние: <strong>{{ lifecycle.value }}</strong></p>
   <p>Токен владельца: <code>{{ record.owner_token }}</code></p>
   {% if record.active_version %}

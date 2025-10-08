@@ -5,6 +5,29 @@
   <p>Ваш токен входа: <code>{{ account.token }}</code></p>
   <p><a href="{{ url_for('web.create_site') }}">Создать новый сайт</a></p>
   {% if sites %}
+    {% for site in sites %}
+      {% if site.lifecycle.value != 'active' %}
+        <div class="status-banner status-{{ site.lifecycle.value }}" data-status-banner>
+          <strong>{{ site.name }}:</strong>
+          {% if site.lifecycle == SiteLifecycle.PENDING %}
+            Сайт находится на рассмотрении модерации.
+          {% elif site.lifecycle == SiteLifecycle.BLOCKED %}
+            Сайт заблокирован. Обратитесь в поддержку, если это ошибка.
+          {% elif site.lifecycle == SiteLifecycle.DELETED %}
+            Сайт удалён и больше не доступен посетителям.
+          {% else %}
+            Состояние сайта: {{ site.lifecycle.value }}.
+          {% endif %}
+          <button type="button" aria-label="Скрыть" data-status-dismiss>&times;</button>
+        </div>
+      {% endif %}
+      {% if site.pending_version() %}
+        <div class="status-banner status-pending" data-status-banner>
+          <strong>{{ site.name }}:</strong> Новая версия ожидает проверки.
+          <button type="button" aria-label="Скрыть" data-status-dismiss>&times;</button>
+        </div>
+      {% endif %}
+    {% endfor %}
     <table>
       <thead>
         <tr><th>Поддомен</th><th>Состояние</th><th>Активная версия</th><th>Действия</th></tr>

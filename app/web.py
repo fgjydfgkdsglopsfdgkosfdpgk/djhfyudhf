@@ -111,6 +111,7 @@ def create_web_blueprint(
             "dashboard.html",
             account=account,
             sites=owned,
+            SiteLifecycle=SiteLifecycle,
         )
 
     @bp.route("/sites/new", methods=["GET", "POST"])
@@ -251,6 +252,7 @@ def create_web_blueprint(
             pending_content=pending_content,
             versions=versions,
             SiteVersionStatus=SiteVersionStatus,
+            SiteLifecycle=SiteLifecycle,
         )
 
     @bp.route("/support", methods=["GET", "POST"])

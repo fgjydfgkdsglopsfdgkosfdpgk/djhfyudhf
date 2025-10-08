@@ -24,6 +24,12 @@
     table { width: 100%; border-collapse: collapse; background: #fff; }
     th, td { padding: 0.5rem; border-bottom: 1px solid #ddd; text-align: left; }
     .status { font-weight: bold; }
+    .status-banner { position: relative; padding: 0.75rem 2.5rem 0.75rem 1rem; border-radius: 4px; margin: 0 0 1rem 0; color: #111; background: #e5e7eb; }
+    .status-banner.status-pending { background: #fef3c7; }
+    .status-banner.status-blocked { background: #fee2e2; }
+    .status-banner.status-deleted { background: #e5e7eb; border: 1px solid #d1d5db; }
+    .status-banner.status-active { background: #d1fae5; }
+    .status-banner button { position: absolute; top: 0.25rem; right: 0.5rem; background: transparent; border: none; font-size: 1.25rem; line-height: 1; cursor: pointer; color: #374151; }
   </style>
 </head>
 <body>
@@ -55,5 +61,15 @@
     {% endwith %}
     {% block content %}{% endblock %}
   </main>
+  <script>
+    document.addEventListener('click', function (event) {
+      if (event.target.matches('[data-status-dismiss]')) {
+        var banner = event.target.closest('[data-status-banner]');
+        if (banner) {
+          banner.remove();
+        }
+      }
+    });
+  </script>
 </body>
 </html>

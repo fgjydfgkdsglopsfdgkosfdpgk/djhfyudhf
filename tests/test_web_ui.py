@@ -29,6 +29,15 @@ def test_ui_account_and_site_flow(app, client, notifier):
     assert notifier.pending[-1] == "mysite"
 
     record = registry.get("mysite")
+
+    dashboard_html = client.get("/ui/dashboard").get_data(as_text=True)
+    assert "data-status-banner" in dashboard_html
+    assert "ожидает" in dashboard_html.lower()
+
+    pending_view = client.get("/ui/sites/mysite").get_data(as_text=True)
+    assert "data-status-banner" in pending_view
+    assert "ещё не прошёл модерацию" in pending_view
+
     registry.approve("mysite")
     assert registry.get("mysite").active_version is not None
 
@@ -48,6 +57,10 @@ def test_ui_account_and_site_flow(app, client, notifier):
     body = response.get_data(as_text=True)
     assert "Контент обновлён" in body
     assert notifier.pending[-1] == "mysite"
+
+    pending_view = client.get("/ui/sites/mysite").get_data(as_text=True)
+    assert pending_view.count("data-status-banner") >= 1
+    assert "ожидает проверки" in pending_view
 
     registry.approve("mysite")
     record = registry.get("mysite")
