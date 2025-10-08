@@ -10,6 +10,8 @@ from flask import abort, make_response, redirect, request, send_from_directory
 from werkzeug.exceptions import NotFound
 from werkzeug.utils import safe_join
 
+from .registry import SiteRecord, SiteRegistry, SiteStatus
+
 
 _ALLOWED_SEGMENT_RE = re.compile(r"^[A-Za-z0-9-]+$")
 _ROOT_SITE = "_"
@@ -18,8 +20,9 @@ _ROOT_SITE = "_"
 class ContentServer:
     """Serve HTML and static assets from a configurable content root."""
 
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, registry: SiteRegistry):
         self.root = root.resolve()
+        self.registry = registry
 
     # ------------------------------------------------------------------
     # Request helpers
@@ -41,43 +44,40 @@ class ContentServer:
 
         return candidate if _ALLOWED_SEGMENT_RE.match(candidate) else None
 
-    def _site_root(self, site: str) -> Optional[Path]:
-        directory = self.root / site
-        if not directory.exists() or not directory.is_dir():
-            return None
-        return directory
+    def _site_root(self, site: str) -> Path:
+        return (self.root / site).resolve()
 
-    def _resolve_site(self, path: str) -> Tuple[str, bool, Optional[str], bool, bool]:
-        """Return ``(site, via_subdomain, resource_path, needs_redirect, unregistered)``."""
+    def _resolve_site(
+        self, path: str
+    ) -> Tuple[str, Optional[SiteRecord], bool, Optional[str], bool, bool]:
+        """Return ``(site, record, via_subdomain, resource_path, needs_redirect, unregistered)``."""
 
         subdomain = self._get_subdomain()
         segments = [segment for segment in path.split("/") if segment]
 
         if subdomain:
-            site_root = self._site_root(subdomain)
-            if not site_root:
-                if _ALLOWED_SEGMENT_RE.match(subdomain):
-                    return subdomain, True, None, False, True
-                abort(404)
-            return subdomain, True, "/".join(segments), False, False
+            record = self.registry.get(subdomain)
+            if record:
+                return subdomain, record, True, "/".join(segments), False, False
+            if _ALLOWED_SEGMENT_RE.match(subdomain):
+                return subdomain, None, True, None, False, True
+            abort(404)
 
         if segments:
             candidate = segments[0]
-            site_root = None
             if _ALLOWED_SEGMENT_RE.match(candidate):
-                site_root = self._site_root(candidate)
-            if site_root:
-                resource_segments = segments[1:]
-                needs_redirect = not resource_segments and not request.path.endswith("/")
-                return candidate, False, "/".join(resource_segments), needs_redirect, False
-            if _ALLOWED_SEGMENT_RE.match(candidate):
-                return candidate, False, None, False, True
+                record = self.registry.get(candidate)
+                if record:
+                    resource_segments = segments[1:]
+                    needs_redirect = not resource_segments and not request.path.endswith("/")
+                    return candidate, record, False, "/".join(resource_segments), needs_redirect, False
+                return candidate, None, False, None, False, True
 
         resource = "/".join(segments)
-        site_root = self._site_root(_ROOT_SITE)
-        if not site_root:
+        record = self.registry.get(_ROOT_SITE)
+        if not record:
             abort(404)
-        return _ROOT_SITE, False, resource, False, False
+        return _ROOT_SITE, record, False, resource, False, False
 
     # ------------------------------------------------------------------
     # Path helpers
@@ -146,6 +146,12 @@ class ContentServer:
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
+    def _has_preview_access(self, record: SiteRecord) -> bool:
+        if record.status == SiteStatus.APPROVED:
+            return True
+        token = request.headers.get("X-Preview-Token") or request.args.get("preview_token")
+        return bool(token) and token == record.preview_token
+
     def _unregistered_site(self, site: str):
         site = escape(site)
         body = (
@@ -161,19 +167,63 @@ class ContentServer:
         resp.headers["Content-Type"] = "text/html; charset=utf-8"
         return resp
 
+    def _pending_site(self, record: SiteRecord):
+        site = escape(record.name)
+        body = (
+            "<!doctype html>"
+            "<html lang=\"ru\">"
+            "<head><meta charset=\"utf-8\"><title>Сайт на проверке</title></head>"
+            "<body>"
+            f"<h1>Сайт «{site}» ожидает модерации</h1>"
+            "<p>Пока страница доступна только владельцу. Загляните позже.</p>"
+            "</body></html>"
+        )
+        resp = make_response(body, 403)
+        resp.headers["Content-Type"] = "text/html; charset=utf-8"
+        return resp
+
+    def _rejected_site(self, record: SiteRecord):
+        site = escape(record.name)
+        body = (
+            "<!doctype html>"
+            "<html lang=\"ru\">"
+            "<head><meta charset=\"utf-8\"><title>Сайт отклонён</title></head>"
+            "<body>"
+            f"<h1>Сайт «{site}» отклонён администрацией</h1>"
+            "<p>Изменения недоступны, свяжитесь с поддержкой для уточнения.</p>"
+            "</body></html>"
+        )
+        resp = make_response(body, 403)
+        resp.headers["Content-Type"] = "text/html; charset=utf-8"
+        return resp
+
     def serve(self, path: str):
-        site_name, via_subdomain, resource_path, needs_redirect, unregistered = self._resolve_site(path)
+        (
+            site_name,
+            record,
+            via_subdomain,
+            resource_path,
+            needs_redirect,
+            unregistered,
+        ) = self._resolve_site(path)
 
         if unregistered:
             return self._unregistered_site(site_name)
+
+        if not record:
+            abort(404)
 
         if needs_redirect:
             qs = ("?" + request.query_string.decode()) if request.query_string else ""
             return redirect(f"{request.path}/{qs}", code=301)
 
+        if record.status == SiteStatus.REJECTED:
+            return self._rejected_site(record)
+
+        if not self._has_preview_access(record):
+            return self._pending_site(record)
+
         site_root = self._site_root(site_name)
-        if not site_root:
-            abort(404)
 
         resource = (resource_path or "index.html") if resource_path is not None else "index.html"
         if resource.endswith("/"):

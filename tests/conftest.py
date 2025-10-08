@@ -10,6 +10,27 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app import create_app
 
 
+class RecordingNotifier:
+    def __init__(self):
+        self.pending: list[str] = []
+        self.approved: list[str] = []
+        self.rejected: list[str] = []
+
+    def site_pending(self, record):
+        self.pending.append(record.name)
+
+    def site_approved(self, record):
+        self.approved.append(record.name)
+
+    def site_rejected(self, record):
+        self.rejected.append(record.name)
+
+
+@pytest.fixture()
+def notifier() -> RecordingNotifier:
+    return RecordingNotifier()
+
+
 @pytest.fixture()
 def content_root(tmp_path: Path) -> Path:
     root = tmp_path
@@ -50,9 +71,10 @@ def content_root(tmp_path: Path) -> Path:
 
 
 @pytest.fixture()
-def app(content_root: Path):
-    application = create_app(content_root)
-    application.config.update(TESTING=True)
+def app(content_root: Path, notifier: RecordingNotifier):
+    application = create_app(content_root, notifier=notifier)
+    application.config.update(TESTING=True, ADMIN_TOKEN="admintoken")
+    application.config["MODERATION_NOTIFIER"] = notifier
     yield application
 
 
