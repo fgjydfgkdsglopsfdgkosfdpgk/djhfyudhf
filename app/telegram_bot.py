@@ -93,6 +93,7 @@ class TelegramModerationBot(ModerationNotifier):
 
     async def _post_init(self, application: Application) -> None:
         # Discover pending sites that existed before the bot started.
+        self._loop = asyncio.get_running_loop()
         for record in self.registry.list_sites().values():
             if record.pending_version():
                 self.site_pending(record)
@@ -105,10 +106,7 @@ class TelegramModerationBot(ModerationNotifier):
         """Start the bot and block the current thread."""
 
         LOGGER.info("Starting Telegram moderation bot")
-        loop = asyncio.new_event_loop()
         try:
-            asyncio.set_event_loop(loop)
-            self._loop = loop
             self._application.run_polling(
                 close_loop=True,
                 stop_signals=None,
@@ -116,9 +114,6 @@ class TelegramModerationBot(ModerationNotifier):
             )
         finally:
             self._loop = None
-            asyncio.set_event_loop(None)
-            if not loop.is_closed():
-                loop.close()
 
     def start_background(self) -> Thread:
         """Start the bot in a background daemon thread."""
