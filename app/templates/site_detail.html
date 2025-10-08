@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Сайт {{ record.name }}{% endblock %}
+{% block content %}
+  <h1>Управление сайтом {{ record.name }}</h1>
+  {% if lifecycle != SiteLifecycle.ACTIVE %}
+    <div class="status-banner status-{{ lifecycle.value }}" data-status-banner>
+      {% if lifecycle == SiteLifecycle.PENDING %}
+        Этот сайт ещё не прошёл модерацию.
+      {% elif lifecycle == SiteLifecycle.BLOCKED %}
+        Этот сайт заблокирован. Доступен только архив и история изменений.
+      {% elif lifecycle == SiteLifecycle.DELETED %}
+        Сайт удалён и недоступен для посетителей.
+      {% else %}
+        Текущее состояние сайта: {{ lifecycle.value }}.
+      {% endif %}
+      <button type="button" aria-label="Скрыть" data-status-dismiss>&times;</button>
+    </div>
+  {% endif %}
+  {% if pending_version and record.active_version %}
+    <div class="status-banner status-pending" data-status-banner>
+      Новая версия <code>{{ pending_version.version_id }}</code> ожидает проверки модерацией.
+      <button type="button" aria-label="Скрыть" data-status-dismiss>&times;</button>
+    </div>
+  {% endif %}
+  <p>Состояние: <strong>{{ lifecycle.value }}</strong></p>
+  <p>Токен владельца: <code>{{ record.owner_token }}</code></p>
+  {% if record.active_version %}
+    <p>Текущая версия: <code>{{ record.active_version }}</code></p>
+  {% else %}
+    <p>Сайт пока недоступен для посетителей.</p>
+  {% endif %}
+  {% if pending_version %}
+    <section class="pending">
+      <h2>Ожидает модерации</h2>
+      <p>Версия <code>{{ pending_version.version_id }}</code> находится на проверке.</p>
+      <p>Токен предпросмотра: <code>{{ pending_version.preview_token }}</code></p>
+      <p>Ссылка предпросмотра появится в Telegram для администрации.</p>
+    </section>
+  {% endif %}
+
+  <form method="post">
+    <input type="hidden" name="action" value="update">
+    <label for="html">index.html</label>
+    <textarea id="html" name="html">{{ (pending_content or active_content).html if (pending_content or active_content) }}</textarea>
+    <label for="css">index.css</label>
+    <textarea id="css" name="css">{{ (pending_content or active_content).css if (pending_content or active_content) }}</textarea>
+    <label for="js">index.js</label>
+    <textarea id="js" name="js">{{ (pending_content or active_content).js if (pending_content or active_content) }}</textarea>
+    <div class="button-row">
+      <button type="submit">Сохранить изменения</button>
+    </div>
+  </form>
+
+  <section>
+    <h2>Версии</h2>
+    <table>
+      <thead>
+        <tr><th>ID</th><th>Статус</th><th>Создана</th><th>Действия</th></tr>
+      </thead>
+      <tbody>
+        {% for version in versions %}
+          <tr>
+            <td>{{ version.version_id }}</td>
+            <td>{{ version.status.value }}</td>
+            <td>{{ version.created_at }}</td>
+            <td>
+              {% if version.status == SiteVersionStatus.APPROVED %}
+                {% if version.version_id != record.active_version %}
+                  <form method="post" class="inline">
+                    <input type="hidden" name="action" value="set_active">
+                    <input type="hidden" name="version_id" value="{{ version.version_id }}">
+                    <button type="submit">Сделать активной</button>
+                  </form>
+                {% else %}
+                  Активная
+                {% endif %}
+                <form method="post" class="inline">
+                  <input type="hidden" name="action" value="delete_version">
+                  <input type="hidden" name="version_id" value="{{ version.version_id }}">
+                  <button type="submit" {% if version.version_id == record.active_version %}disabled{% endif %}>Удалить</button>
+                </form>
+              {% elif version.status == SiteVersionStatus.PENDING %}
+                Ожидает модерации
+              {% else %}
+                Отклонена
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <form method="post">
+    <input type="hidden" name="action" value="delete_site">
+    <div class="button-row">
+      <button type="submit">Удалить сайт</button>
+    </div>
+  </form>
+{% endblock %}
