@@ -1,3 +1,0 @@
-Flask>=2.2
-Werkzeug>=2.2
-python-telegram-bot[job-queue]>=20.6,<21.0
