@@ -34,12 +34,51 @@ const levenshteinDistance = (a, b) => {
   return matrix[a.length][b.length];
 };
 
+const bigrams = (word) => {
+  if (word.length < 2) {
+    return [word];
+  }
+  const result = [];
+  for (let i = 0; i < word.length - 1; i += 1) {
+    result.push(word.slice(i, i + 2));
+  }
+  return result;
+};
+
+const diceCoefficient = (a, b) => {
+  if (!a.length || !b.length) {
+    return 0;
+  }
+  const pairsA = bigrams(a);
+  const pairsB = bigrams(b);
+  const counts = new Map();
+  for (const pair of pairsA) {
+    counts.set(pair, (counts.get(pair) || 0) + 1);
+  }
+  let overlap = 0;
+  for (const pair of pairsB) {
+    const count = counts.get(pair) || 0;
+    if (count > 0) {
+      overlap += 1;
+      counts.set(pair, count - 1);
+    }
+  }
+  return (2 * overlap) / (pairsA.length + pairsB.length);
+};
+
 const isFuzzyTokenMatch = (token, word) => {
   if (token === word) {
     return true;
   }
-  const maxDistance = token.length <= 4 ? 1 : 2;
-  return levenshteinDistance(token, word) <= maxDistance;
+  if (token.length <= 4 || word.length <= 4) {
+    const maxDistance = Math.max(2, Math.floor(Math.min(token.length, word.length) / 2));
+    return levenshteinDistance(token, word) <= maxDistance;
+  }
+  const maxDistance = Math.min(4, Math.floor(Math.max(token.length, word.length) / 2));
+  if (levenshteinDistance(token, word) <= maxDistance) {
+    return true;
+  }
+  return diceCoefficient(token, word) >= 0.4;
 };
 
 const matchPattern = (messageText, pattern) => {

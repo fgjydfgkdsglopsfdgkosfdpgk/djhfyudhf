@@ -46,6 +46,10 @@ const tests = [
     expected: "Чтобы пользоваться ботом"
   },
   {
+    input: "Как палзаватся ботом?",
+    expected: "Чтобы пользоваться ботом"
+  },
+  {
     input: "Hello, how does the bot work",
     lang: "en",
     expected: "To use the bot"
