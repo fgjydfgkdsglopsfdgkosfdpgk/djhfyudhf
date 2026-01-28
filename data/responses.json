@@ -1,0 +1,55 @@
+{
+  "admins": [],
+  "settings": {
+    "language": "ru",
+    "ownerId": ""
+  },
+  "notes": [
+    {
+      "tag": "usebot",
+      "responses": {
+        "ru": {
+          "patterns": [
+            "как пользоваться ботом",
+            "как бот работает",
+            "где взять бота"
+          ],
+          "answer": "Чтобы пользоваться ботом, добавьте его на сервер и используйте команды из #notes."
+        },
+        "en": {
+          "patterns": [
+            "how to use the bot",
+            "how does the bot work",
+            "where to get the bot"
+          ],
+          "answer": "To use the bot, invite it to your server and check #notes for commands."
+        }
+      }
+    },
+    {
+      "tag": "invite",
+      "responses": {
+        "ru": {
+          "patterns": [
+            "где взять бота",
+            "где его взять"
+          ],
+          "answer": "Бота можно взять по ссылке приглашения от админов сервера."
+        }
+      }
+    },
+    {
+      "tag": "rules",
+      "responses": {
+        "ru": {
+          "patterns": [
+            "какие правила",
+            "правила сервера",
+            "где правила"
+          ],
+          "answer": "Правила сервера закреплены в канале с объявлениями."
+        }
+      }
+    }
+  ]
+}

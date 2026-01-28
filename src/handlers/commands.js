@@ -1,7 +1,8 @@
 const { t, listLanguages } = require("../utils/i18n");
 const { saveData } = require("../data/store");
 
-const isAdmin = (data, userId) => data.admins.includes(userId);
+const isOwner = (data, userId) => data.settings.ownerId && data.settings.ownerId === userId;
+const isAdmin = (data, userId) => isOwner(data, userId) || data.admins.includes(userId);
 
 const parseNoteCommand = (content, defaultLanguage) => {
   const parts = content.split("|").map((part) => part.trim());
@@ -36,7 +37,13 @@ const findNote = (data, tag) => data.notes.find((note) => note.tag === tag);
 
 const handleAdminCommand = async (message, data, command, args) => {
   const lang = data.settings.language;
-  if (!isAdmin(data, message.author.id)) {
+
+  if (["addadmin", "deladmin"].includes(command)) {
+    if (!isOwner(data, message.author.id)) {
+      await message.reply(t(lang, "ownerOnly"));
+      return true;
+    }
+  } else if (!isAdmin(data, message.author.id)) {
     await message.reply(t(lang, "noAccess"));
     return true;
   }
@@ -187,5 +194,6 @@ const handlePublicCommand = async (message, data, command) => {
 module.exports = {
   handleAdminCommand,
   handlePublicCommand,
-  isAdmin
+  isAdmin,
+  isOwner
 };

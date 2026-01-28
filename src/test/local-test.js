@@ -3,7 +3,8 @@ const { buildAutoReply } = require("../handlers/messages");
 const sampleData = {
   admins: [],
   settings: {
-    language: "ru"
+    language: "ru",
+    ownerId: "1234567890"
   },
   notes: [
     {
@@ -39,6 +40,10 @@ const tests = [
   {
     input: "Где взять бота и как он работает?",
     expected: "Бота можно взять"
+  },
+  {
+    input: "Как ползоваться бтотом?",
+    expected: "Чтобы пользоваться ботом"
   },
   {
     input: "Hello, how does the bot work",

@@ -1,5 +1,10 @@
 const normalizeText = (text) => text.toLowerCase().replace(/\s+/g, " ").trim();
 
+const tokenize = (text) => {
+  const normalized = normalizeText(text);
+  return normalized.match(/[a-zа-я0-9]+/gi) || [];
+};
+
 const isQuestionLike = (text, questionWords) => {
   const normalized = normalizeText(text);
   if (normalized.includes("?")) {
@@ -8,14 +13,44 @@ const isQuestionLike = (text, questionWords) => {
   return questionWords.some((word) => normalized.includes(word));
 };
 
+const levenshteinDistance = (a, b) => {
+  const matrix = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i += 1) {
+    matrix[i][0] = i;
+  }
+  for (let j = 0; j <= b.length; j += 1) {
+    matrix[0][j] = j;
+  }
+  for (let i = 1; i <= a.length; i += 1) {
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+  return matrix[a.length][b.length];
+};
+
+const isFuzzyTokenMatch = (token, word) => {
+  if (token === word) {
+    return true;
+  }
+  const maxDistance = token.length <= 4 ? 1 : 2;
+  return levenshteinDistance(token, word) <= maxDistance;
+};
+
 const matchPattern = (messageText, pattern) => {
-  const normalizedMessage = normalizeText(messageText);
-  const normalizedPattern = normalizeText(pattern);
-  if (!normalizedPattern) {
+  const patternTokens = tokenize(pattern);
+  if (patternTokens.length === 0) {
     return false;
   }
-  const tokens = normalizedPattern.split(" ");
-  return tokens.every((token) => normalizedMessage.includes(token));
+  const messageTokens = tokenize(messageText);
+  return patternTokens.every((token) =>
+    messageTokens.some((word) => isFuzzyTokenMatch(token, word))
+  );
 };
 
 const shortenAnswer = (answer, maxLength) => {
@@ -49,6 +84,7 @@ const combineAnswers = (answers, maxCombinedMultiplier) => {
 
 module.exports = {
   normalizeText,
+  tokenize,
   isQuestionLike,
   matchPattern,
   combineAnswers

@@ -17,6 +17,8 @@ const client = new Client({
   partials: [Partials.Channel]
 });
 
+let isReady = false;
+
 const shouldRespondInGuild = (message) => {
   if (!message.guild) {
     return true;
@@ -25,7 +27,7 @@ const shouldRespondInGuild = (message) => {
 };
 
 client.on("messageCreate", async (message) => {
-  if (message.author.bot) {
+  if (!isReady || message.author.bot) {
     return;
   }
 
@@ -56,6 +58,7 @@ client.on("messageCreate", async (message) => {
 });
 
 client.once("ready", () => {
+  isReady = true;
   console.log(`Logged in as ${client.user.tag}`);
 });
 

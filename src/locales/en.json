@@ -21,6 +21,7 @@
   ],
   "messages": {
     "noAccess": "You do not have access to manage the bot.",
+    "ownerOnly": "Only the owner can manage admins.",
     "needUserId": "Provide a user ID.",
     "adminAdded": "Admin {userId} added.",
     "adminRemoved": "Admin {userId} removed.",

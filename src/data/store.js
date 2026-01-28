@@ -1,16 +1,25 @@
 const fs = require("fs");
 const path = require("path");
-const { defaultLanguage, dataPath } = require("../config");
+const { defaultLanguage, dataPath, ownerId, adminIds } = require("../config");
 
 const DATA_PATH = path.join(__dirname, "..", "..", dataPath);
 
 const getEmptyData = () => ({
   admins: [],
   settings: {
-    language: defaultLanguage
+    language: defaultLanguage,
+    ownerId: ownerId || null
   },
   notes: []
 });
+
+const mergeEnvAdmins = (admins) => {
+  const merged = new Set(admins);
+  for (const id of adminIds) {
+    merged.add(id);
+  }
+  return Array.from(merged);
+};
 
 const migrateNote = (note, language) => {
   if (note.responses) {
@@ -33,9 +42,10 @@ const migrateData = (data) => {
     ? data.notes.map((note) => migrateNote(note, language))
     : [];
   return {
-    admins: Array.isArray(data.admins) ? data.admins : [],
+    admins: mergeEnvAdmins(Array.isArray(data.admins) ? data.admins : []),
     settings: {
-      language
+      language,
+      ownerId: data.settings?.ownerId || ownerId || null
     },
     notes: migratedNotes
   };
@@ -43,11 +53,8 @@ const migrateData = (data) => {
 
 const loadData = () => {
   if (!fs.existsSync(DATA_PATH)) {
-    const initialAdmins = process.env.ADMIN_IDS
-      ? process.env.ADMIN_IDS.split(",").map((id) => id.trim()).filter(Boolean)
-      : [];
     const initialData = getEmptyData();
-    initialData.admins = initialAdmins;
+    initialData.admins = mergeEnvAdmins(initialData.admins);
     fs.writeFileSync(DATA_PATH, JSON.stringify(initialData, null, 2));
     return initialData;
   }
