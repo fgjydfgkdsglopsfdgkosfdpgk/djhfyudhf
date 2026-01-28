@@ -1,0 +1,47 @@
+{
+  "meta": {
+    "code": "ru",
+    "name": "Русский"
+  },
+  "questionWords": [
+    "как",
+    "где",
+    "когда",
+    "что",
+    "почему",
+    "зачем",
+    "какой",
+    "какие",
+    "сколько",
+    "чем",
+    "куда",
+    "можно ли",
+    "можно",
+    "работает",
+    "пользоваться"
+  ],
+  "messages": {
+    "noAccess": "У вас нет доступа к управлению ботом.",
+    "ownerOnly": "Управлять администраторами может только овнер.",
+    "needUserId": "Укажите ID пользователя.",
+    "adminAdded": "Админ {userId} добавлен.",
+    "adminRemoved": "Админ {userId} удален.",
+    "adminsList": "Админы: {list}",
+    "invalidNoteFormat": "Неверный формат. Пример: #addnote tag | ru | pattern1; pattern2 | ответ",
+    "noteUpdated": "Заметка {tag} ({lang}) обновлена.",
+    "noteAdded": "Заметка {tag} ({lang}) добавлена.",
+    "noteRemoved": "Заметка {tag} удалена.",
+    "noteLangRemoved": "Заметка {tag} ({lang}) удалена.",
+    "notesEmpty": "Пока нет заметок.",
+    "notesList": "Теги: {list}",
+    "noteNotFound": "Нет ответа для тега {tag}.",
+    "languageSet": "Язык по умолчанию: {lang}.",
+    "languageUnknown": "Неизвестный язык. Доступно: {list}.",
+    "languagesList": "Доступные языки: {list}",
+    "currentLanguage": "Текущий язык: {lang}.",
+    "invalidLang": "Укажите код языка (например, ru или en).",
+    "invalidTag": "Укажите тег заметки.",
+    "missingToken": "DISCORD_TOKEN не задан.",
+    "dataError": "Ошибка чтения данных, проверьте файл responses.json."
+  }
+}
