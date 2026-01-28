@@ -1,0 +1,46 @@
+{
+  "meta": {
+    "code": "en",
+    "name": "English"
+  },
+  "questionWords": [
+    "how",
+    "where",
+    "when",
+    "what",
+    "why",
+    "which",
+    "who",
+    "can",
+    "is",
+    "are",
+    "does",
+    "do",
+    "works",
+    "use"
+  ],
+  "messages": {
+    "noAccess": "You do not have access to manage the bot.",
+    "ownerOnly": "Only the owner can manage admins.",
+    "needUserId": "Provide a user ID.",
+    "adminAdded": "Admin {userId} added.",
+    "adminRemoved": "Admin {userId} removed.",
+    "adminsList": "Admins: {list}",
+    "invalidNoteFormat": "Invalid format. Example: #addnote tag | en | pattern1; pattern2 | answer",
+    "noteUpdated": "Note {tag} ({lang}) updated.",
+    "noteAdded": "Note {tag} ({lang}) added.",
+    "noteRemoved": "Note {tag} removed.",
+    "noteLangRemoved": "Note {tag} ({lang}) removed.",
+    "notesEmpty": "No notes yet.",
+    "notesList": "Tags: {list}",
+    "noteNotFound": "No response for tag {tag}.",
+    "languageSet": "Default language: {lang}.",
+    "languageUnknown": "Unknown language. Available: {list}.",
+    "languagesList": "Available languages: {list}",
+    "currentLanguage": "Current language: {lang}.",
+    "invalidLang": "Provide a language code (e.g. ru or en).",
+    "invalidTag": "Provide a note tag.",
+    "missingToken": "DISCORD_TOKEN is not set.",
+    "dataError": "Data file error, check responses.json."
+  }
+}
