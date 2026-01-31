@@ -1,5 +1,6 @@
 const { t, listLanguages } = require("../utils/i18n");
 const { saveData } = require("../data/store");
+const { shortenAnswer } = require("../utils/text");
 
 const isOwner = (data, userId) => data.settings.ownerId && data.settings.ownerId === userId;
 const isAdmin = (data, userId) => isOwner(data, userId) || data.admins.includes(userId);
@@ -14,8 +15,12 @@ const parseNoteCommand = (content, defaultLanguage) => {
   let lang;
   let patternPart;
   let answerParts;
+  let shortAnswer;
 
-  if (parts.length >= 4) {
+  if (parts.length >= 5) {
+    [tag, lang, patternPart, ...answerParts] = parts;
+    shortAnswer = answerParts.pop();
+  } else if (parts.length >= 4) {
     [tag, lang, patternPart, ...answerParts] = parts;
   } else {
     [tag, patternPart, ...answerParts] = parts;
@@ -30,7 +35,8 @@ const parseNoteCommand = (content, defaultLanguage) => {
   if (!tag || patterns.length === 0 || !answer || !lang) {
     return null;
   }
-  return { tag, lang, patterns, answer };
+  const trimmedShort = shortAnswer ? shortAnswer.trim() : "";
+  return { tag, lang, patterns, answer, shortAnswer: trimmedShort || null };
 };
 
 const findNote = (data, tag) => data.notes.find((note) => note.tag === tag);
@@ -115,7 +121,12 @@ const handleAdminCommand = async (message, data, command, args) => {
       note = { tag: parsed.tag, responses: {} };
       data.notes.push(note);
     }
-    note.responses[parsed.lang] = { patterns: parsed.patterns, answer: parsed.answer };
+    const shortAnswer = parsed.shortAnswer || shortenAnswer(parsed.answer, 180);
+    note.responses[parsed.lang] = {
+      patterns: parsed.patterns,
+      answer: parsed.answer,
+      shortAnswer
+    };
     saveData(data);
     const replyKey = command === "addnote" ? "noteAdded" : "noteUpdated";
     await message.reply(t(lang, replyKey, { tag: parsed.tag, lang: parsed.lang }));

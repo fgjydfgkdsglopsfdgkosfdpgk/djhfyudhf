@@ -2,7 +2,7 @@
   "admins": [],
   "settings": {
     "language": "ru",
-    "ownerId": null
+    "ownerId": ""
   },
   "notes": [
     {
@@ -12,17 +12,18 @@
           "patterns": [
             "как пользоваться ботом",
             "как бот работает",
-            "где взять бота"
+            "как мне пользоваться",
+            "как юзать бота"
           ],
-          "answer": "Чтобы пользоваться ботом, добавьте его на сервер и используйте команды из #notes."
+          "answer": "Чтобы пользоваться ботом, добавьте его на сервер, выдайте ему права читать сообщения и используйте команды из #notes."
         },
         "en": {
           "patterns": [
             "how to use the bot",
             "how does the bot work",
-            "where to get the bot"
+            "how can i use the bot"
           ],
-          "answer": "To use the bot, invite it to your server and check #notes for commands."
+          "answer": "To use the bot, invite it to your server, give it read permissions, and check #notes for commands."
         }
       }
     },
@@ -32,7 +33,10 @@
         "ru": {
           "patterns": [
             "где взять бота",
-            "где его взять"
+            "где его взять",
+            "дайте ссылку на бота",
+            "скиньте ссылку",
+            "где скачать"
           ],
           "answer": "Бота можно взять по ссылке приглашения от админов сервера."
         }
