@@ -45,12 +45,23 @@ const bigrams = (word) => {
   return result;
 };
 
-const diceCoefficient = (a, b) => {
+const trigrams = (text) => {
+  if (text.length < 3) {
+    return [text];
+  }
+  const result = [];
+  for (let i = 0; i < text.length - 2; i += 1) {
+    result.push(text.slice(i, i + 3));
+  }
+  return result;
+};
+
+const diceCoefficient = (a, b, gramFn = bigrams) => {
   if (!a.length || !b.length) {
     return 0;
   }
-  const pairsA = bigrams(a);
-  const pairsB = bigrams(b);
+  const pairsA = gramFn(a);
+  const pairsB = gramFn(b);
   const counts = new Map();
   for (const pair of pairsA) {
     counts.set(pair, (counts.get(pair) || 0) + 1);
@@ -113,59 +124,33 @@ const phraseSimilarityScore = (patternText, messageText) => {
   if (normalizedMessage.includes(normalizedPattern)) {
     return 1;
   }
-  return diceCoefficient(normalizedPattern, normalizedMessage);
+  const bigramScore = diceCoefficient(normalizedPattern, normalizedMessage, bigrams);
+  const trigramScore = diceCoefficient(normalizedPattern, normalizedMessage, trigrams);
+  return Math.max(bigramScore, trigramScore);
 };
 
-const matchPattern = (messageText, pattern) => {
+const matchPatternScore = (messageText, pattern) => {
   const patternTokens = tokenize(pattern);
   if (patternTokens.length === 0) {
-    return false;
+    return 0;
   }
   const messageTokens = tokenize(messageText);
   const tokenScore = tokenSimilarityScore(patternTokens, messageTokens);
   const phraseScore = phraseSimilarityScore(pattern, messageText);
-  const combinedScore = Math.max(tokenScore, phraseScore);
-  return combinedScore >= 0.6 || patternTokens.every((token) =>
+  const fallbackScore = patternTokens.every((token) =>
     messageTokens.some((word) => isFuzzyTokenMatch(token, word))
-  );
+  )
+    ? 0.7
+    : 0;
+  return Math.max(tokenScore, phraseScore, fallbackScore);
 };
 
-const shortenAnswer = (answer, maxLength) => {
-  if (answer.length <= maxLength) {
-    return answer;
-  }
-  const sentences = answer.split(/(?<=[.!?])\s+/);
-  let result = "";
-  for (const sentence of sentences) {
-    if ((result + " " + sentence).trim().length > maxLength) {
-      break;
-    }
-    result = `${result} ${sentence}`.trim();
-  }
-  if (!result) {
-    return answer.slice(0, maxLength - 1).trimEnd() + "…";
-  }
-  return result;
-};
-
-const combineAnswers = (answers, maxCombinedMultiplier, maxAbsoluteLength = 1500) => {
-  if (answers.length === 1) {
-    return answers[0];
-  }
-  const combined = answers.join("\n\n");
-  if (combined.length <= maxAbsoluteLength) {
-    return combined;
-  }
-  const baseLength = Math.max(...answers.map((answer) => answer.length));
-  const maxLength = Math.max(Math.floor(baseLength * maxCombinedMultiplier), 300);
-  return shortenAnswer(combined, Math.min(maxLength, maxAbsoluteLength));
-};
+const matchPattern = (messageText, pattern) => matchPatternScore(messageText, pattern) >= 0.62;
 
 module.exports = {
   normalizeText,
   tokenize,
   isQuestionLike,
   matchPattern,
-  combineAnswers,
-  shortenAnswer
+  matchPatternScore
 };

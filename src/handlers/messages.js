@@ -1,63 +1,77 @@
 const { getQuestionWords } = require("../utils/i18n");
-const { isQuestionLike, matchPattern, combineAnswers } = require("../utils/text");
-const { maxCombinedMultiplier } = require("../config");
+const { isQuestionLike, matchPatternScore } = require("../utils/text");
 
-const collectMatchesForLang = (messageText, notes, lang) => {
-  const results = [];
+const MATCH_THRESHOLD = 0.62;
+const STRICT_MATCH_THRESHOLD = 0.8;
+
+const collectBestMatchForLang = (messageText, notes, lang) => {
+  let best = null;
   for (const note of notes) {
     const response = note.responses[lang];
     if (!response) {
       continue;
     }
-    const matched = response.patterns.some((pattern) => matchPattern(messageText, pattern));
-    if (matched) {
-      results.push(response);
+    let bestScore = 0;
+    for (const pattern of response.patterns) {
+      const score = matchPatternScore(messageText, pattern);
+      if (score > bestScore) {
+        bestScore = score;
+      }
     }
-  }
-  return results;
-};
-
-const collectMatchesAnyLang = (messageText, notes) => {
-  const results = [];
-  for (const note of notes) {
-    const responses = Object.values(note.responses || {});
-    for (const response of responses) {
-      const matched = response.patterns.some((pattern) => matchPattern(messageText, pattern));
-      if (matched) {
-        results.push(response);
-        break;
+    if (bestScore >= MATCH_THRESHOLD) {
+      if (!best || bestScore > best.score) {
+        best = { response, score: bestScore };
       }
     }
   }
-  return results;
+  return best;
+};
+
+const collectBestMatchAnyLang = (messageText, notes) => {
+  let best = null;
+  for (const note of notes) {
+    const responses = Object.values(note.responses || {});
+    for (const response of responses) {
+      let bestScore = 0;
+      for (const pattern of response.patterns) {
+        const score = matchPatternScore(messageText, pattern);
+        if (score > bestScore) {
+          bestScore = score;
+        }
+      }
+      if (bestScore >= MATCH_THRESHOLD) {
+        if (!best || bestScore > best.score) {
+          best = { response, score: bestScore };
+        }
+      }
+    }
+  }
+  return best;
 };
 
 const buildAutoReply = (messageText, data) => {
   const lang = data.settings.language;
   const questionWords = getQuestionWords(lang);
-  if (!isQuestionLike(messageText, questionWords)) {
+
+  let best = collectBestMatchForLang(messageText, data.notes, lang);
+  if (!best) {
+    best = collectBestMatchAnyLang(messageText, data.notes);
+  }
+
+  if (!best) {
     return null;
   }
 
-  let matches = collectMatchesForLang(messageText, data.notes, lang);
-  if (matches.length === 0) {
-    matches = collectMatchesAnyLang(messageText, data.notes);
-  }
-
-  if (matches.length === 0) {
+  const questionLike = isQuestionLike(messageText, questionWords);
+  if (!questionLike && best.score < STRICT_MATCH_THRESHOLD) {
     return null;
   }
 
-  if (matches.length === 1) {
-    return matches[0].answer;
-  }
-
-  const combinedAnswers = matches.map((response) => response.shortAnswer || response.answer);
-  return combineAnswers(combinedAnswers, maxCombinedMultiplier);
+  return best.response.answer;
 };
 
 module.exports = {
   buildAutoReply,
-  collectMatchesForLang,
-  collectMatchesAnyLang
+  collectBestMatchForLang,
+  collectBestMatchAnyLang
 };

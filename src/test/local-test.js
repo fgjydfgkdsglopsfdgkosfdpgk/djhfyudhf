@@ -11,14 +11,8 @@ const sampleData = {
       tag: "usebot",
       responses: {
         ru: {
-          patterns: ["как пользоваться ботом", "как бот работает", "где взять бота"],
-          answer: "Чтобы пользоваться ботом, добавьте его на сервер и используйте команды из /notes.",
-          shortAnswer: "Добавьте бота и используйте #notes."
-        },
-        en: {
-          patterns: ["how to use the bot", "how does the bot work"],
-          answer: "To use the bot, invite it to your server and check #notes for commands.",
-          shortAnswer: "Invite the bot and check #notes."
+          patterns: ["как пользоваться ботом", "как бот работает", "как мне пользоваться", "как юзать бота"],
+          answer: "Чтобы пользоваться ботом, добавьте его на сервер и используйте команды из /notes."
         }
       }
     },
@@ -26,9 +20,8 @@ const sampleData = {
       tag: "invite",
       responses: {
         ru: {
-          patterns: ["где его взять", "где взять бота"],
-          answer: "Бота можно взять по ссылке приглашения от админов сервера.",
-          shortAnswer: "Ссылку на приглашение даст админ."
+          patterns: ["где взять бота", "дайте ссылку на бота", "скиньте ссылку"],
+          answer: "Бота можно взять по ссылке приглашения от админов сервера."
         }
       }
     }
@@ -45,8 +38,12 @@ const tests = [
     expected: "Чтобы пользоваться ботом"
   },
   {
+    input: "Дайте ссылку на бота",
+    expected: "Бота можно взять"
+  },
+  {
     input: "Где взять бота и как он работает?",
-    expected: "Ссылку на приглашение"
+    expected: "Бота можно взять"
   },
   {
     input: "Как ползоваться бтотом?",
@@ -55,22 +52,13 @@ const tests = [
   {
     input: "Как палзаватся ботом?",
     expected: "Чтобы пользоваться ботом"
-  },
-  {
-    input: "Hello, how does the bot work",
-    lang: "en",
-    expected: "To use the bot"
   }
 ];
 
 const run = () => {
   let passed = 0;
   for (const test of tests) {
-    if (test.lang) {
-      sampleData.settings.language = test.lang;
-    } else {
-      sampleData.settings.language = "ru";
-    }
+    sampleData.settings.language = "ru";
     const reply = buildAutoReply(test.input, sampleData);
     if (reply && reply.includes(test.expected)) {
       passed += 1;

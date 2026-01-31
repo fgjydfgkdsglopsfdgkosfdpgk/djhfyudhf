@@ -12,21 +12,18 @@
           "patterns": [
             "как пользоваться ботом",
             "как бот работает",
-            "где взять бота",
             "как мне пользоваться",
             "как юзать бота"
           ],
-          "answer": "Чтобы пользоваться ботом, добавьте его на сервер, выдайте ему права читать сообщения и используйте команды из #notes.",
-          "shortAnswer": "Добавьте бота на сервер и используйте команды из #notes."
+          "answer": "Чтобы пользоваться ботом, добавьте его на сервер, выдайте ему права читать сообщения и используйте команды из #notes."
         },
         "en": {
           "patterns": [
             "how to use the bot",
             "how does the bot work",
-            "where to get the bot"
+            "how can i use the bot"
           ],
-          "answer": "To use the bot, invite it to your server, give it read permissions, and check #notes for commands.",
-          "shortAnswer": "Invite the bot and check #notes for commands."
+          "answer": "To use the bot, invite it to your server, give it read permissions, and check #notes for commands."
         }
       }
     },
@@ -37,10 +34,11 @@
           "patterns": [
             "где взять бота",
             "где его взять",
+            "дайте ссылку на бота",
+            "скиньте ссылку",
             "где скачать"
           ],
-          "answer": "Бота можно взять по ссылке приглашения от админов сервера.",
-          "shortAnswer": "Ссылку на приглашение выдаст админ сервера."
+          "answer": "Бота можно взять по ссылке приглашения от админов сервера."
         }
       }
     },
@@ -53,8 +51,7 @@
             "правила сервера",
             "где правила"
           ],
-          "answer": "Правила сервера закреплены в канале с объявлениями.",
-          "shortAnswer": "Правила в закрепе канала с объявлениями."
+          "answer": "Правила сервера закреплены в канале с объявлениями."
         }
       }
     }
